@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Apple 图片处理小工具</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+  <style>
+    body {margin:0;padding:0;font-family:"Inter","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+      background:linear-gradient(135deg,#74ebd5,#9face6);min-height:100vh;display:flex;align-items:center;justify-content:center;overflow-x:hidden;}
+    .container {max-width:960px;width:100%;background:#fff;border-radius:20px;padding:30px 40px;box-shadow:0 12px 36px rgba(0,0,0,0.15);margin:30px;}
+    h1 {font-size:28px;font-weight:700;margin:0;text-align:center;color:#333;}
+    h1 .apple-word {color:#e63946;cursor:pointer;user-select:none;}
+    .github-link {text-align:center;margin-top:10px;}
+    .github-link a {display:inline-block;padding:8px 16px;font-size:14px;font-weight:500;color:#fff;background:#24292e;border-radius:6px;text-decoration:none;}
+    .local-tool-card {margin:20px auto;padding:18px 22px;border-radius:14px;background:#f9f9ff;box-shadow:0 4px 16px rgba(0,0,0,0.08);text-align:center;}
+    .local-tool-card h3 {margin:0 0 8px;font-size:18px;color:#333;}
+    .local-tool-card p {margin:0 0 14px;font-size:14px;color:#555;}
+    .local-tool-card a {display:inline-block;padding:10px 20px;font-size:14px;font-weight:500;color:#fff;background:#28a745;border-radius:8px;text-decoration:none;}
+    .toolbar {margin:25px 0 15px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;}
+    .btn {padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;}
+    .btn.secondary {background:#28a745;color:#fff;}
+    .btn.secondary:hover {background:#1e7e34;}
+    .btn.download-all {display:block;margin:20px auto 0;background:#6c63ff;color:#fff;}
+    .btn.download-all:hover {background:#4a3eff;}
+    #fileInput {display:none;}
+    .drop-zone {width:100%;height:120px;border:2px dashed #bbb;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:500;color:#666;cursor:pointer;background:#fafafa;transition:0.25s;}
+    .drop-zone.dragover {background:#e7f3ff;border-color:#007bff;color:#007bff;}
+    .format-select {margin:20px 0;text-align:center;font-size:15px;}
+    select,input[type=checkbox]{margin-left:8px;}
+    #output {margin-top:20px;}
+    .batch {margin-top:24px;padding:18px;border-radius:14px;background:#fdfdfd;box-shadow:0 4px 12px rgba(0,0,0,0.08);}
+    .batch-header {display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+    .progress {width:100%;background:#f1f1f1;border-radius:8px;height:18px;margin:6px 0 10px;}
+    .bar {height:100%;width:0%;background:linear-gradient(90deg,#6c63ff,#007bff);color:#fff;font-size:12px;line-height:18px;text-align:center;}
+    .status {font-size:13px;color:#555;margin-bottom:8px;}
+    .grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;}
+    .thumb {border-radius:8px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;font-size:13px;min-height:110px;cursor:pointer;overflow:hidden;}
+    .thumb img,.thumb video {width:100%;height:100%;object-fit:cover;}
+    .loader {border:3px solid #eee;border-top:3px solid #007bff;border-radius:50%;width:22px;height:22px;animation:spin 1s linear infinite;}
+    @keyframes spin {0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+    .preview-overlay {position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:999;}
+    .preview-overlay img {max-width:90%;max-height:90%;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.6);}
+    .falling {position:fixed;top:-40px;pointer-events:none;white-space:nowrap;}
+    .falling-apple {font-size:26px;animation:fall 4s linear forwards,sway 2s ease-in-out infinite;}
+    .falling-text {font-weight:bold;animation:fall-rotate 4s linear forwards;}
+    @keyframes fall {to {transform:translateY(110vh) rotate(360deg);opacity:0;}}
+    @keyframes sway {0%,100%{margin-left:0}50%{margin-left:40px}}
+    @keyframes fall-rotate {0%{transform:translateY(0) rotate(0deg);opacity:1;}100%{transform:translateY(110vh) rotate(720deg);opacity:0;}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1><span class="apple-word">Apple</span> 图片处理小工具</h1>
+    <div class="github-link"><a href="https://github.com/3Water-M/livp-heic-converter" target="_blank">GitHub 项目主页</a></div>
+    <div class="local-tool-card">
+      <h3>推荐下载本地版</h3>
+      <p>处理速度更快，无需上传大文件，适合批量使用。</p>
+      <a href="https://waterm.lanzouw.com/ihczt36qkdti" target="_blank">📥 下载本地处理工具</a>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn secondary" onclick="document.getElementById('fileInput').click()">选择文件</button>
+      <input id="fileInput" type="file" accept=".livp,.heic" multiple />
+      <div class="format-select">
+        输出格式：
+        <select id="outputFormat">
+          <option value="image/jpeg" selected>JPEG</option>
+          <option value="image/png">PNG</option>
+        </select>
+        <label><input type="checkbox" id="extractVideo"> 提取视频 (MOV)</label>
+      </div>
+    </div>
+
+    <div id="dropZone" class="drop-zone">将 .livp 或 .heic 文件拖拽到此区域</div>
+    <div id="output"></div>
+    <button id="downloadAll" class="btn download-all">打包下载全部文件</button>
+  </div>
+
+  <script>
+    // 🍎 彩蛋
+    let clickCount=0,lastClickTime=0;
+    document.querySelector('.apple-word').addEventListener('click',()=>{
+      const now=Date.now();
+      if(now-lastClickTime>3000) clickCount=0;
+      lastClickTime=now; clickCount++;
+      if(clickCount>=3){for(let i=0;i<6;i++)createTextFall("3Water");clickCount=0;}
+      else{for(let i=0;i<6;i++)createApple();}
+    });
+    function createApple(){const apple=document.createElement('div');apple.className='falling falling-apple';apple.textContent='🍎';apple.style.left=Math.random()*100+'vw';apple.style.animationDuration=(3+Math.random()*2)+'s, 2s';document.body.appendChild(apple);setTimeout(()=>apple.remove(),5000);}
+    function createTextFall(text){const el=document.createElement('div');el.className='falling falling-text';el.textContent=text;el.style.left=Math.random()*100+'vw';el.style.fontSize=(18+Math.random()*10)+'px';el.style.color=['red','blue','green','purple','orange'][Math.floor(Math.random()*5)];el.style.animationDuration=(3+Math.random()*2)+'s';document.body.appendChild(el);setTimeout(()=>el.remove(),5000);}
+
+    // 文件上传
+    const dropZone=document.getElementById("dropZone"),fileInput=document.getElementById("fileInput"),
+          output=document.getElementById("output"),downloadAllBtn=document.getElementById("downloadAll");
+    let batchCount=0,allFiles=[];
+
+    dropZone.addEventListener("dragover",e=>{e.preventDefault();dropZone.classList.add("dragover");});
+    dropZone.addEventListener("dragleave",()=>dropZone.classList.remove("dragover"));
+    dropZone.addEventListener("drop",e=>{e.preventDefault();dropZone.classList.remove("dragover");handleFiles(e.dataTransfer.files);});
+    fileInput.addEventListener("change",e=>handleFiles(e.target.files));
+
+    async function handleLIVP(file,format,extractVideo){
+      const data=await file.arrayBuffer();
+      const zip=await JSZip.loadAsync(data);
+      const entries=Object.values(zip.files);
+      const result={images:[],videos:[]};
+      for(const f of entries){
+        if(f.name.endsWith(".heic")){
+          const blob=await f.async("blob");
+          const conv=await heic2any({blob,toType:format});
+          result.images.push({name:file.name.replace(/\.[^/.]+$/,"")+(format==="image/jpeg"?".jpg":".png"),blob:conv});
+        }
+        if(f.name.endsWith(".jpg")){
+          const blob=await f.async("blob");
+          result.images.push({name:file.name.replace(/\.[^/.]+$/,"")+".jpg",blob});
+        }
+        if(extractVideo && f.name.toLowerCase().endsWith(".mov")){
+          const blob=await f.async("blob");
+          result.videos.push({name:file.name.replace(/\.[^/.]+$/,"")+".mov",blob});
+        }
+      }
+      return result;
+    }
+
+    async function handleFiles(files){
+      if(!files.length)return;
+      batchCount++;
+      const batchEl=document.createElement("div");
+      batchEl.className="batch";
+      batchEl.innerHTML=`<div class="batch-header"><h3>第 ${batchCount} 次转换</h3><button class="btn secondary batch-download">下载本次批次</button></div>
+        <div class="progress"><div class="bar">0%</div></div>
+        <div class="status">正在准备...</div>
+        <div class="grid"></div>`;
+      output.appendChild(batchEl);
+
+      const bar=batchEl.querySelector(".bar"),
+            grid=batchEl.querySelector(".grid"),
+            status=batchEl.querySelector(".status"),
+            format=document.getElementById("outputFormat").value,
+            extractVideo=document.getElementById("extractVideo").checked,
+            batchBtn=batchEl.querySelector(".batch-download");
+      const batchFiles=[];
+      const total=files.length;
+
+      for(let i=0;i<files.length;i++){
+        const file=files[i],ext=file.name.split('.').pop().toLowerCase();
+        if(ext!=="livp"&&ext!=="heic")continue;
+        status.textContent=`正在处理第 ${i+1} 张 / 共 ${total} 张`;
+        const thumb=document.createElement("div");thumb.className="thumb";thumb.innerHTML=`<div class="loader"></div>`;grid.appendChild(thumb);
+        try{
+          if(ext==="heic"){
+            const blob=await heic2any({blob:file,toType:format});
+            const url=URL.createObjectURL(blob);
+            thumb.innerHTML=`<img src="${url}">`;thumb.onclick=()=>showPreview(url);
+            const outName=file.name.replace(/\.[^/.]+$/,"")+(format==="image/jpeg"?".jpg":".png");
+            batchFiles.push({name:outName,blob}); allFiles.push({name:outName,blob});
+          } else if(ext==="livp"){
+            const result=await handleLIVP(file,format,extractVideo);
+            result.images.forEach(img=>{
+              const url=URL.createObjectURL(img.blob);
+              thumb.innerHTML=`<img src="${url}">`;thumb.onclick=()=>showPreview(url);
+              batchFiles.push(img); allFiles.push(img);
+            });
+            result.videos.forEach(v=>{
+              const url=URL.createObjectURL(v.blob);
+              const vthumb=document.createElement("div");vthumb.className="thumb";
+              vthumb.innerHTML=`<video src="${url}" controls></video>`;
+              grid.appendChild(vthumb);
+              batchFiles.push(v); allFiles.push(v);
+            });
+          }
+        }catch(err){thumb.textContent="处理失败";console.error(err);}
+        bar.style.width=((i+1)/files.length*100).toFixed(0)+"%"; bar.textContent=bar.style.width;
+      }
+      status.textContent="处理完成 ✅";
+      batchBtn.onclick=()=>downloadBatch(batchFiles,"batch"+batchCount+".zip");
+    }
+
+    function downloadBatch(files,zipName){
+      const zip=new JSZip();files.forEach(f=>zip.file(f.name,f.blob));
+      zip.generateAsync({type:"blob"}).then(content=>{
+        const a=document.createElement("a");a.href=URL.createObjectURL(content);a.download=zipName;a.click();
+      });
+    }
+    downloadAllBtn.addEventListener("click",()=>{
+      if(!allFiles.length)return;
+      const zip=new JSZip();allFiles.forEach(f=>zip.file(f.name,f.blob));
+      zip.generateAsync({type:"blob"}).then(content=>{
+        const a=document.createElement("a");a.href=URL.createObjectURL(content);a.download="all_batches.zip";a.click();
+      });
+    });
+
+    function showPreview(url){
+      const overlay=document.createElement("div");
+      overlay.className="preview-overlay";
+      overlay.innerHTML=`<img src="${url}">`;
+      overlay.onclick=()=>overlay.remove();
+      document.body.appendChild(overlay);
+    }
+  </script>
+</body>
+</html>
